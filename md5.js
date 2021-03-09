@@ -1,6 +1,6 @@
 const crypto = require("crypto")
-
-const rounds = 1 // how many times we hash the hash
+// time complexity - complexitatea de timp
+const rounds = 200000 // de cate ori hash-uim hash-ul
 const value = "hello world"
 
 console.time("hash time")

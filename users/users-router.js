@@ -1,55 +1,78 @@
-const express = require("express")
-const Users = require("./users-model")
+const express = require('express');
+const bcrypt = require('bcryptjs');
 
-const router = express.Router()
+const Users = require('./users-model');
+const { restrict } = require('./users-middleware');
 
-router.get("/users", async (req, res, next) => {
-	try {
-		res.json(await Users.find())
-	} catch(err) {
-		next(err)
-	}
-})
+const router = express.Router();
 
-router.post("/users", async (req, res, next) => {
-	try {
-		const { username, password } = req.body
-		const user = await Users.findBy({ username }).first()
+router.get('/users', restrict(), async (req, res, next) => {
+  try {
+    res.json(await Users.find());
+  } catch (err) {
+    next(err);
+  }
+});
 
-		if (user) {
-			return res.status(409).json({
-				message: "Username is already taken",
-			})
-		}
+router.post('/users', async (req, res, next) => {
+  try {
+    const { username, password } = req.body;
+    const user = await Users.findBy({ username }).first();
 
-		const newUser = await Users.add({
-			username,
-			password,
-		})
+    if (user) {
+      return res.status(409).json({
+        message: 'Username is already taken',
+      });
+    }
 
-		res.status(201).json(newUser)
-	} catch(err) {
-		next(err)
-	}
-})
+    const newUser = await Users.add({
+      username,
+      password: await bcrypt.hash(password, 14),
+    });
 
-router.post("/login", async (req, res, next) => {
-	try {
-		const { username, password } = req.body
-		const user = await Users.findBy({ username }).first()
-		
-		if (!user) {
-			return res.status(401).json({
-				message: "Invalid Credentials",
-			})
-		}
+    res.status(201).json(newUser);
+  } catch (err) {
+    next(err);
+  }
+});
 
-		res.json({
-			message: `Welcome ${user.username}!`,
-		})
-	} catch(err) {
-		next(err)
-	}
-})
+router.post('/login', async (req, res, next) => {
+  try {
+    const { username, password } = req.body;
+    const user = await Users.findBy({ username }).first();
 
-module.exports = router
+    // password = qwerty1234
+    const passwordValid = await bcrypt.compare(password, user.password);
+
+    if (!user || !passwordValid) {
+      return res.status(401).json({
+        message: 'Invalid Credentials',
+      });
+    }
+
+    // auth session
+    req.session.user = user;
+
+    res.json({
+      message: `Welcome ${user.username}!`,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/logout', async (req, res, next) => {
+  try {
+    req.session.destroy((err) => {
+      if (err) {
+        next(err);
+      } else {
+        res.status(204).end();
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+module.exports = router;
